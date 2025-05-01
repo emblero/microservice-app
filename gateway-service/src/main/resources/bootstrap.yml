@@ -1,0 +1,6 @@
+spring:
+  application:
+    name: gateway-service  # Имя сервиса (должно совпадать с конфигом в Git)
+  cloud:
+    config:
+      uri: http://config-service:8888  # Адрес Config Server
