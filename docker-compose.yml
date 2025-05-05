@@ -1,35 +1,82 @@
+version: '3.8'
+
 services:
   config-service:
     build: ./config-service
+    hostname: config-service
     ports:
       - "8888:8888"
+    environment:
+      - SPRING_CLOUD_CONFIG_SERVER_GIT_URI=https://github.com/emblero/config-repo
+      - SPRING_CLOUD_CONFIG_SERVER_GIT_DEFAULT-LABEL=main
+      - SPRING_CLOUD_CONFIG_SERVER_GIT_SEARCH-PATHS={application}
+      - SPRING_CLOUD_CONFIG_SERVER_GIT_FORCE_PULL=true
+      - SPRING_CLOUD_CONFIG_SERVER_GIT_TIMEOUT=60
+      - SPRING_APPLICATION_NAME=config-service
+    networks:
+      - microservices-network
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z localhost 8888 || exit 0"]
+      interval: 10s
+      timeout: 5s
+      start_period: 30s
+      retries: 5
 
-  discovery-service:
-    build:
-      context: discovery-service1
-      dockerfile: Dockerfile
+  discovery-service1:
+    build: ./discovery-service1
+    hostname: discovery-service1
     ports:
       - "8761:8761"
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - EUREKA_INSTANCE_HOSTNAME=discovery-service1
+      - EUREKA_INSTANCE_PREFER_IP_ADDRESS=true
+      - EUREKA_CLIENT_REGISTER_WITH_EUREKA=false
+      - EUREKA_CLIENT_FETCH_REGISTRY=false
+      - EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE=http://discovery-service1:8761/eureka/
+    networks:
+      - microservices-network
     depends_on:
-      - config-service
+      config-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z localhost 8761 || exit 0"]
+      interval: 15s
+      timeout: 5s
+      start_period: 40s
+      retries: 5
 
   gateway-service:
     build:
       context: gateway-service
       dockerfile: Dockerfile
+    hostname: gateway-service
     ports:
       - "8080:8080"
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - SPRING_CONFIG_IMPORT=optional:configserver:http://config-service:8888
+      - SPRING_CLOUD_CONFIG_FAIL_FAST=false
+      - SPRING_CLOUD_CONFIG_RETRY_INITIAL_INTERVAL=5000
+      - SPRING_CLOUD_CONFIG_RETRY_MAX_INTERVAL=15000
+      - SPRING_CLOUD_CONFIG_RETRY_MAX_ATTEMPTS=10
+      - EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE=http://discovery-service1:8761/eureka/
+      - EUREKA_INSTANCE_PREFER_IP_ADDRESS=true
+      - EUREKA_INSTANCE_HOSTNAME=gateway-service
+    networks:
+      - microservices-network
     depends_on:
-      - config-service
-      - discovery-service
+      config-service:
+        condition: service_healthy
+      discovery-service1:
+        condition: service_started
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/actuator/health || exit 0"]
+      interval: 20s
+      timeout: 5s
+      start_period: 60s
+      retries: 5
 
-
-  order-service:
-    build:
-      context: order-service
-      dockerfile: Dockerfile
-    ports:
-      - "8081:8081"
-    depends_on:
-      - config-service
-      - discovery-service
+networks:
+  microservices-network:
+    driver: bridge

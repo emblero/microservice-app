@@ -1,0 +1,38 @@
+# bootstrap.yml для Config Service
+spring:
+  application:
+    name: config-service
+    cloud:
+      config:
+        server:
+          git:
+            uri: https://github.com/emblero/config-repo
+            default-label: main
+            search-paths: '{application}'  # Критически важно!
+            clone-on-start: true
+            force-pull: true
+            timeout: 60
+            basedir: /tmp/config-repo-cache  # Явное указание каталога
+
+    # Настройки healthcheck
+    health:
+      config:
+        enabled: true
+        fail-fast: true  # Останавливать сервис при ошибке
+
+# Настройки Actuator (для healthcheck)
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info  # Открытые эндпоинты
+  endpoint:
+    health:
+      show-details: always
+      probes:
+        enabled: true
+
+# Настройки сервера
+server:
+  port: 8888
+  connection-timeout: 10s  # Таймаут HTTP-соединений
