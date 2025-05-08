@@ -9,15 +9,24 @@ services:
     environment:
       - SPRING_CLOUD_CONFIG_SERVER_GIT_URI=https://github.com/emblero/config-repo
       - SPRING_CLOUD_CONFIG_SERVER_GIT_DEFAULT-LABEL=main
-      - SPRING_CLOUD_CONFIG_SERVER_GIT_SEARCH-PATHS={application},{application}1  # Поддержка обоих вариантов имен
+      - SPRING_CLOUD_CONFIG_SERVER_GIT_SEARCH-PATHS={application},{application}1
       - SPRING_CLOUD_CONFIG_SERVER_GIT_FORCE_PULL=true
       - SPRING_CLOUD_CONFIG_SERVER_GIT_TIMEOUT=60
-      - SPRING_CLOUD_CONFIG_SERVER_GIT_CLONE_ON_START=true  # Принудительное клонирование при старте
+      - SPRING_CLOUD_CONFIG_SERVER_GIT_CLONE_ON_START=true
       - SPRING_APPLICATION_NAME=config-service
     networks:
-      - microservices-network
+      microservices-network:
+        aliases:
+          - config-service
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
+    dns_opt:
+      - ndots:1
+    sysctls:
+      - net.ipv4.ip_local_reserved_ports=8888
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:8888/actuator/health || exit 0"]  # Более надежная проверка
+      test: ["CMD-SHELL", "curl -f http://localhost:8888/actuator/health || exit 0"]
       interval: 15s
       timeout: 5s
       start_period: 45s
@@ -31,17 +40,27 @@ services:
     environment:
       - SPRING_PROFILES_ACTIVE=docker
       - EUREKA_INSTANCE_HOSTNAME=discovery-service1
-      - EUREKA_INSTANCE_PREFER_IP_ADDRESS=false  # Критически важно для Docker
+      - EUREKA_INSTANCE_PREFER_IP_ADDRESS=false
       - EUREKA_INSTANCE_APPNAME=discovery-service1
       - EUREKA_INSTANCE_INSTANCE_ID=${EUREKA_INSTANCE_HOSTNAME}:${SERVER_PORT}
       - EUREKA_CLIENT_REGISTER_WITH_EUREKA=false
       - EUREKA_CLIENT_FETCH_REGISTRY=false
       - EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE=http://discovery-service1:8761/eureka/
-      - EUREKA_SERVER_PEER_NODE_URL=http://discovery-service1:8761/eureka/  # Явное указание ноды
+      - EUREKA_SERVER_PEER_NODE_URL=http://discovery-service1:8761/eureka/
       - EUREKA_SERVER_ENABLE_SELF_PRESERVATION=false
       - EUREKA_SERVER_WAIT_TIME_IN_MS_WHEN_SYNC_EMPTY=0
+      - JAVA_TOOL_OPTIONS=-Dsun.net.inetaddr.ttl=0 -Dsun.net.inetaddr.negative.ttl=0
     networks:
-      - microservices-network
+      microservices-network:
+        aliases:
+          - discovery-service1
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
+    dns_opt:
+      - ndots:1
+    sysctls:
+      - net.ipv4.ip_local_reserved_ports=8761
     depends_on:
       config-service:
         condition: service_healthy
@@ -67,18 +86,28 @@ services:
       - SPRING_CLOUD_CONFIG_RETRY_MAX_INTERVAL=15000
       - SPRING_CLOUD_CONFIG_RETRY_MAX_ATTEMPTS=10
       - EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE=http://discovery-service1:8761/eureka/
-      - EUREKA_INSTANCE_PREFER_IP_ADDRESS=false  # Используем hostname
+      - EUREKA_INSTANCE_PREFER_IP_ADDRESS=false
       - EUREKA_INSTANCE_HOSTNAME=gateway-service
       - EUREKA_INSTANCE_APPNAME=gateway-service
       - EUREKA_INSTANCE_INSTANCE_ID=${EUREKA_INSTANCE_HOSTNAME}:${SERVER_PORT}
       - EUREKA_CLIENT_HEALTHCHECK_ENABLED=true
+      - JAVA_TOOL_OPTIONS=-Dsun.net.inetaddr.ttl=0 -Dsun.net.inetaddr.negative.ttl=0
     networks:
-      - microservices-network
+      microservices-network:
+        aliases:
+          - gateway-service
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
+    dns_opt:
+      - ndots:1
+    sysctls:
+      - net.ipv4.ip_local_reserved_ports=8080
     depends_on:
       config-service:
         condition: service_healthy
       discovery-service1:
-        condition: service_healthy  # Более строгая проверка
+        condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:8080/actuator/health || exit 0"]
       interval: 30s
@@ -90,4 +119,4 @@ networks:
   microservices-network:
     name: microservices-network
     driver: bridge
-    attachable: true  # Разрешить ручное подключение контейнеров
+    attachable: true

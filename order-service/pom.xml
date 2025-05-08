@@ -49,7 +49,7 @@
         </dependency>
         <dependency>
             <groupId>org.springframework.kafka</groupId>
-            <artifactId>spring-kafka</artifactId>
+            <artifactId>spring-kafka</artifactId>z
         </dependency>
 
         <dependency>
